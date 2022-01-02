@@ -1,11 +1,9 @@
 package main
 
 import (
-	"fmt"
-	"os"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
-	gosql "github.com/ilibs/gosql/v2"
 )
 
 // this is what our authentication_table looks like
@@ -15,75 +13,25 @@ type authentication_credenetials struct {
 	Password string `json:"password" db:"password"`
 }
 
+type sessions_table struct {
+	Id         int       `json:"id" db:"id"`
+	UserId     int       `json:"userId" db:"userId"`
+	Jwt_token  string    `json:"jwt_token" db:"jwt_token"`
+	Created_at time.Time `json:"created_at" db:"created_at"`
+}
+
 func (u *authentication_credenetials) TableName() string {
-	config := getInstance()
-	return config.Authentication_table
+	return "jwt_sessions"
 }
 
 func (u *authentication_credenetials) PK() string {
 	return "id"
 }
-
-func authenticate(username string, password string) bool {
+func (u *sessions_table) TableName() string {
 	config := getInstance()
-	dsn := fmt.Sprintf("%s:%s@tcp(127.0.0.1:3306)/%s", config.DatabaseUsername, config.DatabasePassword, config.DatabaseName)
-	configs := make(map[string]*gosql.Config)
-
-	configs["default"] = &gosql.Config{
-		Enable:  true,
-		Driver:  "mysql",
-		Dsn:     dsn,
-		ShowSql: true,
-	}
-	gosql.Connect(configs)
-	thisCredentials := authentication_credenetials{
-		Username: username,
-	}
-	gosql.Get(thisCredentials, "select username, password where username = ?", thisCredentials.Username)
-
-	fmt.Println(thisCredentials)
-	os.Exit(0)
-
-	if CheckPasswordHash(password, thisCredentials.Password) && thisCredentials.Username == username {
-		return true
-	}
-	return false
+	return config.Authentication_table
 }
 
-func register(username string, password string) (int64, error) {
-	config := getInstance()
-	dsn := fmt.Sprintf("%s:%s@tcp(127.0.0.1:3306)/%s", config.DatabaseUsername, config.DatabasePassword, config.DatabaseName)
-	configs := make(map[string]*gosql.Config)
-
-	configs["default"] = &gosql.Config{
-		Enable:  true,
-		Driver:  "mysql",
-		Dsn:     dsn,
-		ShowSql: true,
-	}
-	gosql.Connect(configs)
-	Hashedpassword, _ := HashPassword(password)
-	var thisCredentials authentication_credenetials = authentication_credenetials{
-		Id:       0,
-		Username: username,
-		Password: Hashedpassword,
-	}
-
-	gosql.Get(&thisCredentials, "select id, username from authentication where username  = ? ", username)
-
-	if thisCredentials.Id != 0 {
-		return -1, fmt.Errorf("the username %s is already taken", username)
-	}
-
-	id, err := gosql.Model(&thisCredentials).Create()
-	if err != nil {
-		panic(err)
-	}
-
-	return id, nil
-}
-
-func main() {
-	fmt.Println(register("unique", "password"))
-
+func (u *sessions_table) PK() string {
+	return "id"
 }
